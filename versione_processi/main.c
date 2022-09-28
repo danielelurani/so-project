@@ -1,0 +1,116 @@
+/* Main del programma */
+
+#include "librerie.h"
+
+int main(){
+	
+	/* Descrittori pipe */
+	int filedes[2]; 
+	
+	int vittoria;			//variabile per il controllo della vittoria 
+    int pid_nave;			//pid nave giocatore
+	int pid_alieno;			//pid alieni di primo livello
+	int pid_alieno2;		//pid alieni di secondo livello
+	int sprite_alieni;		//carattere che viene assegnato ad ogni alieno per il riconoscimento
+	int c=5;				//distanza iniziale tra gli alieni
+
+	/* Inizializza lo schermo e i colori */
+	initscr();
+	start_color();
+	
+	//creazione coppia caratteri bianchi su sfondo nero
+	init_pair(1, COLOR_WHITE, COLOR_BLACK);
+	attron(COLOR_PAIR(1));
+
+	/* Disabilita la visualizzazione dei tasti premuti */   
+  	noecho();
+
+	/* Abilita la gestione dei tasti freccia */
+  	keypad(stdscr, 1);
+
+	// Disattiva l'input stdin bufferizzato
+	cbreak();
+			
+   	srand((int)time(NULL));
+  	curs_set(0);
+
+	if(pipe(filedes)==-1){
+        	perror("Errore nella creazione della pipe!\n");
+        	_exit(1);
+    	}
+
+    /* Generazione processo nave */
+	pid_nave=fork();
+
+	switch(pid_nave){
+		case -1:
+			perror("Errore nell\'esecuzione della fork!\n");
+			exit(1);
+
+		case 0:
+			//Chiusura del descrittore in lettura
+		    close(filedes[0]);
+
+			//Il primo processo figlio invoca la funzione nave
+		    nave_giocatore(filedes[1]); 
+			exit(0);
+	}
+
+
+	/* Generazione processi alieni di secondo livello */
+	for(sprite_alieni=MINALIENI2;sprite_alieni<=MAXALIENI2;sprite_alieni++){
+
+		pid_alieno2=fork();
+		switch(pid_alieno2){
+			case -1:
+				perror("Errore nell\'esecuzione della pipe!\n");
+				_exit(1);
+			case 0:
+				//Chiusura descrittore di lettura
+				close(filedes[0]); 
+				
+				//Il secondo processo figlio invoca la funzione alieno1
+				alieno(filedes[1], 111, c, sprite_alieni);
+				exit(0);
+		}
+
+		c=c+6;
+	}
+	
+	c=5;
+	
+
+	/* Generazione processi alieni di primo livello */
+	for(sprite_alieni=MINALIENI;sprite_alieni<=MAXALIENI;sprite_alieni++){
+		pid_alieno=fork();
+		switch(pid_alieno){
+			case -1:
+				perror("Errore nell\'esecuzione della pipe!\n");
+				_exit(1);
+			case 0:
+				//Chiusura descrittore di lettura
+				close(filedes[0]); 
+				
+				//Il secondo processo figlio invoca la funzione alieno1
+				alieno(filedes[1], 111, c, sprite_alieni);
+				exit(0);
+		}
+		c=c+6;
+	}
+	
+	//Chiusura del descrittore di scrittura
+	close(filedes[1]);
+
+	//Il processo padre invoca la funzione di controllo
+	vittoria=controllo(filedes[0], filedes[1]);
+
+	kill(pid_nave, 1);
+   	kill(pid_alieno, 1);
+   	kill(pid_alieno2, 1);
+   	endwin();
+
+	if(vittoria==1)printf("\n\n\n\n HAI VINTO \n\n\n\n");
+	if(vittoria==0)printf("\n\n\n\n HAI PERSO \n\n\n\n");
+
+    	return 0;
+};
